@@ -1,6 +1,9 @@
 use clap::Parser;
 use std::path::{Path,PathBuf};
-use std::fs;
+use std::{fs,env};
+use anyhow::anyhow;
+use embedded_can::{blocking::Can, Frame as EmbeddedFrame, ExtendedId};
+use socketcan::{CanFdSocket, CanFrame, Result, Socket};
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short, long)]
@@ -13,8 +16,18 @@ struct Args {
     node_id: String,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+
+    let mut sock = match CanFdSocket::open(&args.interface) {
+        Ok(sock) => {
+            println!("Successfully opened interface on {}",args.interface);
+            sock
+        },
+        Err(e) => {
+            return Err(anyhow!(e));
+        }
+    };
 
     let resolved_path = if args.binary.exists() {
         args.binary
@@ -34,14 +47,14 @@ fn main() {
             bytes
         }
         Err(e) => {
-            eprintln!("Error reading binary file {:?}: {}", resolved_path, e);
-            std::process::exit(1);
+            return Err(anyhow::format_err!("Error reading binary file {:?}: {}", resolved_path, e));
         }
     };
-
+    /*
     for i in 0..10{
         println!("Byte {} = {}",i,hex::encode(&[binvec[i]]));
     }
+    */
 
 
 
@@ -52,14 +65,34 @@ fn main() {
             id
         }
         Ok(_) => {
-            eprintln!("Error: Node ID 0x{} is out of range (max 0x1F).", args.node_id);
-            std::process::exit(1);
+            return Err(anyhow::format_err!("ID {} Out of range",args.node_id));
         }
         Err(e) => {
-            eprintln!("Error parsing hex node_id '{}': {}", args.node_id, e);
-            std::process::exit(1);
+            return Err(anyhow::format_err!("Error parsing hex node_id '{}': {}", args.node_id, e));
+
         }
     };
     
     println!("Node ID: {}", nodeid);
+    let test_id = dfr_can_id(3,5,5,1).expect("Error creating CAN ID");
+    println!("{:029b}",test_id.as_raw());
+    Ok(())
+}
+
+
+fn dfr_can_id(priority: u32, target: u32, command: u32, source: u32 ) -> anyhow::Result<embedded_can::ExtendedId> {
+    // makes an extended id with [3 bits priority][5 bit target id][16 bit command][5 bit source id]
+    if priority > 7 {
+        return Err(anyhow::format_err!("Priority {} is out of range",priority));
+    }else if target > 31 {
+        return Err(anyhow::format_err!("Target ID {} is out of range",target));
+    }else if command > 65535 {
+        return Err(anyhow::format_err!("Command {} is out of range",command));
+    }else if source > 31 {
+        return Err(anyhow::format_err!("Source {} is out of range",source));
+    }
+    let id_u32 = (priority << 26) | (target << 21) | (command << 5) | source;
+    Ok(embedded_can::ExtendedId::new(id_u32).unwrap())
+
+
 }
