@@ -1,4 +1,3 @@
-
 #![allow(dead_code)]
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,7 +7,6 @@ pub struct DfrCanId {
     pub command: u16,
     pub source: u16,
 }
-// Add this implementation to your shared protocol.rs
 
 impl DfrCanId {
     pub fn new(priority: u16, target: u16, command: u16, source: u16) -> Result<Self, &'static str> {
@@ -43,11 +41,13 @@ impl DfrCanId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
 pub enum BootloaderCommand {
-    Ping = 0x45,
-    Erase = 0x46,
+    Ping = 0x40,
+    Erase = 0x45,
+    EraseOk = 0x46,
     Write = 0x47,
-    Jump = 0x48,
-    SetAddress = 0x49,
+    WriteOk = 0x48,
+    AddressAndSize = 0x4A,
+    Jump = 0xAAAA,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,8 +80,10 @@ impl TryFrom<u16> for BootloaderCommand {
         match v {
             x if x == BootloaderCommand::Ping as u16 => Ok(BootloaderCommand::Ping),
             x if x == BootloaderCommand::Erase as u16 => Ok(BootloaderCommand::Erase),
-            x if x == BootloaderCommand::SetAddress as u16 => Ok(BootloaderCommand::SetAddress),
+            x if x == BootloaderCommand::EraseOk as u16 => Ok(BootloaderCommand::EraseOk),
+            x if x == BootloaderCommand::AddressAndSize as u16 => Ok(BootloaderCommand::AddressAndSize),
             x if x == BootloaderCommand::Write as u16 => Ok(BootloaderCommand::Write),
+            x if x == BootloaderCommand::WriteOk as u16 => Ok(BootloaderCommand::WriteOk),
             x if x == BootloaderCommand::Jump as u16 => Ok(BootloaderCommand::Jump),
             _ => Err(()),
         }
